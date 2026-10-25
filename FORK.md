@@ -39,7 +39,15 @@ repos can manage the policy from terraform now:
   (`workflow_dispatch`) does a snapshot build and uploads `dist/` as a workflow
   artifact without publishing.
 - **Upstream watch** (`upstream-watch.yml`, weekly): fails, and so pings Discord via
-  `notify-failure.yml`, when an upstream release contains the resource.
+  `notify-failure.yml`, in two cases: an upstream release now contains the resource
+  (retire the fork), or upstream's latest release is newer than `.fork-base` (we
+  are out of date; rebase). The summary lists the files both sides changed, which
+  is where conflicts will be.
+- **Scheduled** (`scheduled.yml`, weekly): Renovate, limited by `renovate.json` to
+  the workflow pins. Go modules are deliberately not managed, so the code stays
+  "upstream's release plus our patch"; upstream's own dependency bumps arrive with
+  the next upstream release. Nothing automerges. Needs the `CI_APP_*` secrets and
+  the tnoff-ci App on this repo.
 - **Notify on failure**: fleet-wide Discord alert for non-PR failures.
 
 ## Verifying a release
@@ -49,6 +57,26 @@ The zips are not GPG-signed. Check provenance with the GitHub CLI:
 ```bash
 gh attestation verify terraform-provider-github_<version>_linux_arm64.zip --repo tnoff/terraform-provider-github
 ```
+
+## Rebasing onto a new upstream release
+
+`.fork-base` holds the upstream tag this fork is based on. `main` is that tag
+plus our commits (the #3446 patch, the import fix, and fork-only CI/docs), so a
+new base is a rebase of those commits:
+
+```bash
+git remote add upstream https://github.com/integrations/terraform-provider-github.git   # once
+git fetch upstream --tags
+git checkout -b rebase-v6.14.0 main
+git rebase --onto v6.14.0 "$(cat .fork-base)" rebase-v6.14.0
+echo v6.14.0 > .fork-base && git commit -am "chore: rebase onto upstream v6.14.0"
+go build ./... && go vet ./... && go test ./...
+```
+
+Expect conflicts in `github/provider.go` (the four registrations) and anywhere
+`upstream-watch` listed. If upstream renamed or changed the go-github major
+version, fix the import in the two new resources as `2d595a96` did. Open a PR
+into `main`, then tag a release.
 
 ## Version numbers
 

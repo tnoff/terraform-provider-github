@@ -1,0 +1,24 @@
+name: Scheduled
+
+# Weekly Renovate for the workflow pins, the same reusable workflow every other
+# GitHub-canonical repo uses. Needs the CI_APP_CLIENT_ID and CI_APP_PRIVATE_KEY
+# Actions secrets (set for this repo by tnoff/terraform's infra stack) and the
+# tnoff-ci App installed on this repo; until then this job fails and
+# notify-failure.yml says so. renovate.json limits it to workflow pins.
+# upstream-watch.yml is the other scheduled job (upstream drift).
+
+on:
+  schedule:
+    - cron: '20 5 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  renovate:
+    name: Renovate
+    uses: tnoff/github-workflows/.github/workflows/renovate.yml@e56cf84573df481eed0ffb0dcfa9768fa867470b # renovate-v1.1.4
+    secrets:
+      app_client_id: ${{ secrets.CI_APP_CLIENT_ID }}
+      app_private_key: ${{ secrets.CI_APP_PRIVATE_KEY }}
