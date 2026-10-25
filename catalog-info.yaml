@@ -36,7 +36,7 @@ spec:
   owner: group:default/admin
   lifecycle: experimental
   dependsOn:
-    # ci.yaml, notify-failure.yml and (via the release gate) the contract check
-    # call tnoff/github-workflows reusable workflows at a pinned SHA -- a real
-    # CI-time dependency, not just a repo reference.
+    # ci.yaml (trufflehog, check-workflow-contracts) and notify-failure.yml
+    # (discord-notify) call tnoff/github-workflows reusable workflows at a
+    # pinned SHA -- a real CI-time dependency, not just a repo reference.
     - component:default/github-workflows
