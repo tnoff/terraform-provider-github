@@ -20,25 +20,7 @@ permissions:
 jobs:
   test:
     name: Build and test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set-up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build
-        run: CGO_ENABLED=0 go build ./...
-      - name: Vet
-        run: go vet ./...
-      # Same -skip as upstream's `make test`: not every TestAcc* guards itself
-      # on TF_ACC (TestAccGithubActionsOrganizationPermissions panics without a
-      # live org), so they are excluded by name. This is the unit suite plus
-      # compilation of every test file, including our new resources' tests.
-      - name: Test
-        run: CGO_ENABLED=0 go test ./... -skip '^TestAcc' -timeout=10m -count=1
+    uses: ./.github/workflows/test.yaml
 
   secrets:
     name: Scan for secrets

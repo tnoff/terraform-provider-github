@@ -24,8 +24,16 @@ permissions:
   contents: read
 
 jobs:
+  # The release re-runs the checks rather than trusting that CI passed: CI runs
+  # on pull requests only, and a tag can be cut on any commit. Applies to the
+  # manual snapshot run too.
+  test:
+    name: Build and test
+    uses: ./.github/workflows/test.yaml
+
   goreleaser:
     name: GoReleaser
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       attestations: write
