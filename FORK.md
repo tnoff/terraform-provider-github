@@ -81,9 +81,26 @@ into `main`, then tag a release.
 
 ## Version numbers
 
-Tag releases `vX.Y.Z` with a plain version and no pre-release suffix. Terraform
-does not select pre-release versions for range constraints such as `~> 6.0`, so a
-tag like `v6.13.0-fork.1` would never be picked.
+Tag releases `v<upstream base>+fork.<n>`, for example `v6.13.0+fork.1`, then
+`v6.13.0+fork.2` for a fork-only change, and `v6.14.0+fork.1` after rebasing onto
+upstream v6.14.0. The `+fork.N` part is semver *build metadata*.
+
+Tested against a Terraform filesystem mirror (2026-10-25), because the obvious
+alternatives fail:
+
+| Version | `~> 6.0` | Exact pin |
+|---|---|---|
+| `6.13.0+fork.1` (this scheme) | selected | `= 6.13.0` does **not** match it |
+| `6.13.0-fork.1` (pre-release suffix) | **never selected** | only `= 6.13.0-fork.1` |
+| `fork-6.13.0` (prefix) | not valid semver | n/a |
+
+So consumers must use range constraints (the fleet uses `~> 6.0`); an exact pin of
+the plain upstream version will not pick the fork up. `terraform version` and the
+lock file show `+fork.N`, so a patched build is never mistaken for the registry's.
+
+GitHub may rewrite `+` in release asset names. Consumers must therefore derive the
+mirror file name from the *tag* (`terraform-provider-github_<version>_<os>_<arch>.zip`)
+and rename on download, not trust the asset name.
 
 ## Retiring the fork
 
