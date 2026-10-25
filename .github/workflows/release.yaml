@@ -1,38 +1,40 @@
 name: Release
 
-# This GitHub action creates a release when a tag that matches the pattern
-# "v*" (e.g. v0.1.0) is created.
+# A pushed v* tag builds the binaries with GoReleaser and publishes them to a
+# GitHub release with a SHA256SUMS file and a build-provenance attestation.
+# Not signed with GPG or cosign (upstream's signing keys are not available
+# here); the attestation is what proves the zips came from this workflow, and
+# `gh attestation verify` checks it. See FORK.md.
+#
+# workflow_dispatch runs a snapshot build instead: nothing is published, the
+# dist/ output is uploaded as a workflow artifact, so the pipeline can be
+# tested without cutting a tag.
+
 on:
   push:
     tags:
       - v*
+  workflow_dispatch:
 
 concurrency:
   group: release
   cancel-in-progress: false
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   goreleaser:
     name: GoReleaser
     runs-on: ubuntu-latest
-    # Releases need permissions to read and write the repository contents.
-    # GitHub considers creating releases and uploading assets as writing contents.
     permissions:
       attestations: write
       contents: write
       id-token: write
-    environment:
-      name: release
-      deployment: false
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # Allow goreleaser to access older tag information.
+          # GoReleaser reads older tags to compute the version and changelog.
           fetch-depth: 0
 
       - name: Set-up Go
@@ -41,30 +43,24 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install Syft
-        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        id: import_gpg
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.PASSPHRASE }}
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         id: goreleaser
         env:
-          # GitHub sets the GITHUB_TOKEN secret automatically.
           GITHUB_TOKEN: ${{ github.token }}
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
         with:
-          args: release --clean
+          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
 
       - name: Attest artifacts
+        if: github.event_name == 'push'
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
           subject-checksums: ./dist/${{ github.event.repository.name }}_${{ fromJSON(steps.goreleaser.outputs.metadata).version }}_SHA256SUMS
+
+      - name: Upload snapshot build
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: snapshot-dist
+          path: dist/*.zip
+          retention-days: 7

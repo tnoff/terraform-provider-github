@@ -1,0 +1,41 @@
+name: Upstream watch
+
+# This fork exists only until integrations/terraform-provider-github ships the
+# github_actions_repository_fork_pr_contributor_approval resource (issue #3445,
+# PR #3446). This job fails, which pages Discord through notify-failure.yml,
+# the moment an upstream RELEASE contains it, so the fork can be retired. A
+# new upstream release without the resource is only reported in the summary.
+
+on:
+  schedule:
+    - cron: '30 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: Check upstream release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM: integrations/terraform-provider-github
+      RESOURCE_DOC: docs/resources/actions_repository_fork_pr_contributor_approval.md
+    steps:
+      - name: Look for the resource in the latest upstream release
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)
+          pr_state=$(gh pr view 3446 --repo "${UPSTREAM}" --json state --jq .state)
+          {
+            echo "### Upstream watch"
+            echo "- latest upstream release: \`${latest}\`"
+            echo "- upstream PR #3446: \`${pr_state}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          if gh api "repos/${UPSTREAM}/contents/${RESOURCE_DOC}?ref=${latest}" >/dev/null 2>&1; then
+            echo "- **\`${latest}\` ships the resource: retire this fork**" >> "${GITHUB_STEP_SUMMARY}"
+            echo "::error::Upstream ${latest} ships github_actions_repository_fork_pr_contributor_approval. Retire this fork: see FORK.md ('Retiring the fork')."
+            exit 1
+          fi
+          echo "- resource not in a release yet" >> "${GITHUB_STEP_SUMMARY}"
