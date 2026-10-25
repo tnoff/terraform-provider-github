@@ -33,7 +33,8 @@ repos can manage the policy from terraform now:
 
 - **CI** (`ci.yaml`): build, vet, unit tests, secret scan, workflow-contract
   check; the `CI result` job aggregates them and is the one required check.
-  Acceptance tests (`TestAcc*`) skip without `TF_ACC` and are not run.
+  Acceptance tests (`TestAcc*`) are excluded by name, as in upstream's `make test`:
+  they need a live org and token.
 - **Release** (`release.yaml`): pushing a `v*` tag builds and publishes the zips,
   a `SHA256SUMS` file and a build-provenance attestation. A manual run
   (`workflow_dispatch`) does a snapshot build and uploads `dist/` as a workflow
