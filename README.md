@@ -1,3 +1,9 @@
+> **Fork notice.** This is a temporary fork of
+> [`integrations/terraform-provider-github`](https://github.com/integrations/terraform-provider-github)
+> v6.13.0 that adds the fork-PR contributor approval resources from upstream
+> [#3446](https://github.com/integrations/terraform-provider-github/pull/3446).
+> It is not published to the Terraform Registry. See [FORK.md](FORK.md).
+
 # Terraform Provider GitHub
 
 |<img src="https://cloud.githubusercontent.com/assets/98681/24211275/c4ebd04e-0ee8-11e7-8606-061d656a42df.png" width="72" height="" alt="GitHub Logo"> | <img src="https://raw.githubusercontent.com/hashicorp/terraform-website/d841a1e5fca574416b5ca24306f85a0f4f41b36d/content/source/assets/images/logo-terraform-main.svg" width="300px" alt="Terraform Logo">|

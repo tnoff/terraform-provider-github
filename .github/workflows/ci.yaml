@@ -1,30 +1,26 @@
 name: CI
 
+# Pull-request and main checks for the fork. Deliberately smaller than
+# upstream's CI: no golangci-lint (it tracks `latest` and would fail this
+# pinned v6.13.0 base for reasons unrelated to our patch), no acceptance tests
+# (they need an org-scoped token and a live GitHub org). See FORK.md.
+
 on:
-  push:
-    branches:
-      - main
-      - release-v*
   pull_request:
-    branches:
-      - main
-      - release-v*
+  push:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
-  ci:
-    name: Continuous Integration
+  test:
+    name: Build and test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -33,84 +29,41 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: latest
-      - run: make build -o lintcheck # Stop running `make lintcheck` before build. Linting is handled separately
-      - run: make test
+      - name: Build
+        run: CGO_ENABLED=0 go build ./...
+      - name: Vet
+        run: go vet ./...
+      # Same -skip as upstream's `make test`: not every TestAcc* guards itself
+      # on TF_ACC (TestAccGithubActionsOrganizationPermissions panics without a
+      # live org), so they are excluded by name. This is the unit suite plus
+      # compilation of every test file, including our new resources' tests.
+      - name: Test
+        run: CGO_ENABLED=0 go test ./... -skip '^TestAcc' -timeout=10m -count=1
 
-  lint-new:
-    name: Strict linting of new code
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set-up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: make .golangci.new.yml
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: latest
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          only-new-issues: true
-          args: --config=.golangci.new.yml
+  secrets:
+    name: Scan for secrets
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@b7790887a768e86127e2b6a29ed06631c947972f # trufflehog-v1.0.1
 
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Set-up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Set-up Terraform
-        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        with:
-          terraform_version: latest
-          terraform_wrapper: false
-      - run: make checkdocs
-      - run: make validatedocs
-      - uses: rvben/rumdl@c6fa6612be03d6dd87812a1e6eb904cbbf1d9dce # v0.2.27
-        with:
-          path: ./docs
-          report-type: annotations
+  contracts:
+    name: Workflow contracts
+    uses: tnoff/github-workflows/.github/workflows/check-workflow-contracts.yml@adea087c43d56fd13d5b1abf2d5f2ba3e695784d # check-workflow-contracts-v1.0.0
 
-  check:
-    name: Check
-    needs:
-      - ci
-      - docs
-      - lint-new
+  # The single context to require in the ruleset. An aggregate means the
+  # required-check list never changes when jobs are added or renamed.
+  result:
+    name: CI result
     if: always()
+    needs: [test, secrets, contracts]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
-      - name: Check
+      - name: Fail unless every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          set -euo pipefail
-          results=( ${{ join(needs.*.result, ' ') }} )
-          for result in "${results[@]}"; do
-            if [[ "${result}" == "failure" ]] || [[ "${result}" == "cancelled" ]]; then
-              echo "::error::Workflow failed!"
+          echo "job results: ${RESULTS}"
+          for r in ${RESULTS}; do
+            if [ "${r}" != "success" ]; then
+              echo "::error::a required job finished as '${r}'"
               exit 1
             fi
           done

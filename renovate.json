@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Only the workflow pins. Go modules are deliberately NOT managed: this fork is upstream's tagged release plus one patch, and bumping go.mod here would silently turn it into something upstream never released (upstream's own Dependabot bumps arrive with the next upstream release, via the rebase that upstream-watch asks for). github-actions covers the SHA-pinned third-party actions in our workflows; custom.regex is the fleet preset's tracker for the tnoff/github-workflows reusable-workflow pins. Nothing automerges: the release workflow builds what ships, and CI result is not a required check yet.",
+  "extends": [
+    "github>tnoff/github-workflows//renovate/default-github",
+    "github>tnoff/github-workflows//renovate/no-automerge"
+  ],
+  "enabledManagers": ["github-actions", "custom.regex"]
+}

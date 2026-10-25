@@ -1,0 +1,82 @@
+name: Upstream watch
+
+# Two questions, asked weekly. Either answer failing the job pages Discord
+# through notify-failure.yml, which is how a scheduled check reaches a human.
+#
+#   1. Does an upstream RELEASE now contain the resource this fork exists for
+#      (github_actions_repository_fork_pr_contributor_approval; issue #3445,
+#      PR #3446)? Then retire the fork (FORK.md, "Retiring the fork").
+#   2. Is upstream's latest release newer than the one this fork is based on
+#      (.fork-base)? Then we are out of date: rebase (FORK.md, "Rebasing onto
+#      a new upstream release"). The summary lists the files both sides
+#      changed, which is where the conflicts will be.
+#
+# Question 1 wins when both are true: there is nothing to rebase if the fork
+# is about to be retired.
+
+on:
+  schedule:
+    - cron: '30 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: Check upstream
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      UPSTREAM: integrations/terraform-provider-github
+      RESOURCE_DOC: docs/resources/actions_repository_fork_pr_contributor_approval.md
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Compare with the latest upstream release
+        run: |
+          set -euo pipefail
+          base=$(tr -d '[:space:]' < .fork-base)
+          latest=$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)
+          pr_state=$(gh pr view 3446 --repo "${UPSTREAM}" --json state --jq .state)
+          {
+            echo "### Upstream watch"
+            echo "- fork based on: \`${base}\`"
+            echo "- latest upstream release: \`${latest}\`"
+            echo "- upstream PR #3446: \`${pr_state}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          # 1. Has the resource shipped?
+          if gh api "repos/${UPSTREAM}/contents/${RESOURCE_DOC}?ref=${latest}" >/dev/null 2>&1; then
+            echo "- **\`${latest}\` ships the resource: retire this fork**" >> "${GITHUB_STEP_SUMMARY}"
+            echo "::error::Upstream ${latest} ships github_actions_repository_fork_pr_contributor_approval. Retire this fork: see FORK.md ('Retiring the fork')."
+            exit 1
+          fi
+
+          # 2. Are we behind?
+          if [ "${base}" = "${latest}" ]; then
+            echo "- up to date with upstream's latest release" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          commits=$(gh api "repos/${UPSTREAM}/compare/${base}...${latest}" --jq .ahead_by)
+          # Files each side changed relative to the shared base. Our side is
+          # compared across forks (owner:branch), so no clone of upstream is
+          # needed.
+          upstream_files=$(gh api --paginate "repos/${UPSTREAM}/compare/${base}...${latest}?per_page=100" --jq '.files[].filename' | sort -u)
+          our_files=$(gh api --paginate "repos/${UPSTREAM}/compare/${base}...${GITHUB_REPOSITORY_OWNER}:main?per_page=100" --jq '.files[].filename' | sort -u)
+          overlap=$(comm -12 <(printf '%s\n' "${upstream_files}") <(printf '%s\n' "${our_files}") || true)
+          {
+            echo "- **out of date: ${commits} upstream commits between \`${base}\` and \`${latest}\`**"
+            echo "- files changed on both sides (expect conflicts here):"
+            if [ -n "${overlap}" ]; then
+              printf '%s\n' "${overlap}" | head -40 | sed 's/^/  - `/; s/$/`/'
+              total=$(printf '%s\n' "${overlap}" | wc -l)
+              if [ "${total}" -gt 40 ]; then echo "  - ...and $((total - 40)) more"; fi
+            else
+              echo "  - none"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+          echo "::error::Fork is based on ${base} but upstream has released ${latest} (${commits} commits ahead). Rebase: see FORK.md ('Rebasing onto a new upstream release')."
+          exit 1

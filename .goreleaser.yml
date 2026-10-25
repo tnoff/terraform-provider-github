@@ -2,9 +2,6 @@
 # behavior.
 version: 2
 
-env:
-  - COSIGN_YES=true
-
 before:
   hooks:
     # this is just an example and not a requirement for provider building/publishing
@@ -21,28 +18,19 @@ builds:
       - -trimpath
     ldflags:
       - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}"
+    # Only what this fleet runs: OKE runners (linux/arm64), x86 CI and dev
+    # boxes (linux/amd64), and the laptop (darwin/arm64, darwin/amd64).
     goos:
-      - freebsd
-      - windows
       - linux
       - darwin
     goarch:
       - amd64
-      - "386"
-      - arm
       - arm64
-    ignore:
-      - goos: darwin
-        goarch: "386"
     binary: "{{ .ProjectName }}_v{{ .Version }}"
 
 archives:
   - formats: ["zip"]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-
-sboms:
-  - id: default
-    artifacts: source
 
 checksum:
   extra_files:
@@ -50,29 +38,6 @@ checksum:
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
-
-signs:
-  - id: gpg
-    cmd: gpg
-    args:
-      - --batch
-      - --local-user
-      - "{{ .Env.GPG_FINGERPRINT }}"
-      - --output
-      - "${signature}"
-      - --detach-sign
-      - "${artifact}"
-    artifacts: checksum
-  - id: cosign
-    signature: "${artifact}.sbom.json.bundle"
-    cmd: cosign
-    args:
-      - sign-blob
-      - --new-bundle-format
-      - --bundle
-      - "${signature}"
-      - "${artifact}"
-    artifacts: checksum
 
 release:
   extra_files:
