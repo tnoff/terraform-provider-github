@@ -1,0 +1,42 @@
+# Backstage catalog descriptor. Discovered automatically -- the portal's GitHub
+# provider reads catalog-info.yaml from the default branch of every repo the
+# tnoff-backstage App can see, so adding this file is the whole of onboarding.
+#
+# github.com/project-slug is DERIVED by the portal's
+# AnnotateScmSlugEntityProcessor from the location this file was fetched from.
+# No techdocs-ref: there is no mkdocs.yml here, FORK.md is the documentation.
+#
+# lifecycle is `experimental` while this is a temporary fork that nothing
+# consumes yet. Move it to `production` when tnoff/terraform's stacks actually
+# install this build, and delete the entity with the fork (see FORK.md,
+# "Retiring the fork"). The `upstream-watch` workflow says when.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: terraform-provider-github
+  description: >-
+    Temporary fork of integrations/terraform-provider-github v6.13.0 plus upstream
+    PR #3446 (the fork-PR contributor approval resources, unreleased upstream).
+    Built by GoReleaser into zips on this repo's GitHub releases and consumed by
+    tnoff/terraform's stacks in place of the registry provider, until upstream
+    releases the resource.
+  tags:
+    - terraform
+    - provider
+    - fork
+  links:
+    - url: https://github.com/integrations/terraform-provider-github
+      title: Upstream provider
+    - url: https://github.com/integrations/terraform-provider-github/issues/3445
+      title: Upstream issue (why the fork exists)
+    - url: https://github.com/integrations/terraform-provider-github/pull/3446
+      title: Upstream PR (the patch)
+spec:
+  type: library
+  owner: group:default/admin
+  lifecycle: experimental
+  dependsOn:
+    # ci.yaml, notify-failure.yml and (via the release gate) the contract check
+    # call tnoff/github-workflows reusable workflows at a pinned SHA -- a real
+    # CI-time dependency, not just a repo reference.
+    - component:default/github-workflows
