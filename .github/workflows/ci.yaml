@@ -5,10 +5,10 @@ name: CI
 # pinned v6.13.0 base for reasons unrelated to our patch), no acceptance tests
 # (they need an org-scoped token and a live GitHub org). See FORK.md.
 
+# Pull requests only. A merge to main runs nothing here: the PR's checks already
+# covered the same commit, and a tag push is what builds a release.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
