@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set-up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -42,7 +42,7 @@ jobs:
 
   secrets:
     name: Scan for secrets
-    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@b7790887a768e86127e2b6a29ed06631c947972f # trufflehog-v1.0.1
+    uses: tnoff/github-workflows/.github/workflows/trufflehog.yml@717d50d682ec44c1e8a7b73e18f12a90735cc4d8 # trufflehog-v1.0.2
 
   contracts:
     name: Workflow contracts
